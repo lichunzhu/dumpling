@@ -9,6 +9,7 @@ import (
 	"github.com/pingcap/dumpling/v4/log"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/pingcap/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -42,17 +43,27 @@ func Dump(conf *Config) (err error) {
 		return err
 	}
 
-	conf.Tables, err = listAllTables(pool, databases)
-	if err != nil {
-		return err
-	}
-
-	if !conf.NoViews {
-		views, err := listAllViews(pool, databases)
+	if len(conf.TableList) > 0 {
+		for _, table := range conf.TableList {
+			db, tb, err := splitTableName(table)
+			if err != nil {
+				return err
+			}
+			conf.Tables = conf.Tables.AppendTables(db, tb)
+		}
+	} else {
+		conf.Tables, err = listAllTables(pool, databases)
 		if err != nil {
 			return err
 		}
-		conf.Tables.Merge(views)
+
+		if !conf.NoViews {
+			views, err := listAllViews(pool, databases)
+			if err != nil {
+				return err
+			}
+			conf.Tables.Merge(views)
+		}
 	}
 
 	err = filterTables(conf)
@@ -179,6 +190,33 @@ func dumpTable(ctx context.Context, conf *Config, db *sql.DB, dbName string, tab
 	}
 
 	return writer.WriteTableData(ctx, tableIR)
+}
+
+func splitTableName(table string) (string, string, error) {
+	table = strings.TrimSpace(table)
+	tableInfos := strings.Split(table, ".")
+	if len(tableInfos) != 2 {
+		return "", "", errors.Errorf("unsupported table %s", table)
+	}
+	db, tb := tableInfos[0], tableInfos[1]
+	return trimOutQuotes(db), trimOutQuotes(tb), nil
+}
+
+// trimOutQuotes trims a pair of single quotes or a pair of double quotes from arg
+func trimOutQuotes(arg string) string {
+	argLen := len(arg)
+	if argLen >= 2 {
+		if arg[0] == '"' && arg[argLen-1] == '"' {
+			return arg[1 : argLen-1]
+		}
+		if arg[0] == '\'' && arg[argLen-1] == '\'' {
+			return arg[1 : argLen-1]
+		}
+		if arg[0] == '`' && arg[argLen-1] == '`' {
+			return arg[1 : argLen-1]
+		}
+	}
+	return arg
 }
 
 func concurrentDumpTable(ctx context.Context, writer Writer, conf *Config, db *sql.DB, dbName string, tableName string) (bool, error) {

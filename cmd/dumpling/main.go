@@ -27,6 +27,7 @@ import (
 
 var (
 	database      string
+	tables        []string
 	host          string
 	user          string
 	port          int
@@ -68,6 +69,7 @@ func main() {
 	pflag.ErrHelp = errors.New("")
 
 	pflag.StringVarP(&database, "database", "B", "", "Database to dump")
+	pflag.StringSliceVarP(&tables, "tables-list", "T", []string{}, "Tables to dump")
 	pflag.StringVarP(&host, "host", "H", "127.0.0.1", "The host to connect to")
 	pflag.StringVarP(&user, "user", "u", "root", "Username with privileges to run the dump")
 	pflag.IntVarP(&port, "port", "P", 4000, "TCP/IP port to connect to")
@@ -105,6 +107,7 @@ func main() {
 
 	conf := export.DefaultConfig()
 	conf.Database = database
+	conf.TableList = tables
 	conf.Host = host
 	conf.User = user
 	conf.Port = port

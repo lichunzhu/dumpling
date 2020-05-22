@@ -11,12 +11,13 @@ import (
 )
 
 type Config struct {
-	Database string
-	Host     string
-	User     string
-	Port     int
-	Password string
-	Threads  int
+	Database  string
+	TableList []string
+	Host      string
+	User      string
+	Port      int
+	Password  string
+	Threads   int
 
 	LogLevel  string
 	LogFile   string
