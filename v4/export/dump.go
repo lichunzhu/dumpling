@@ -44,6 +44,7 @@ func Dump(conf *Config) (err error) {
 	}
 
 	if len(conf.TableList) > 0 {
+		conf.Tables = DatabaseTables{}
 		for _, table := range conf.TableList {
 			db, tb, err := splitTableName(table)
 			if err != nil {
