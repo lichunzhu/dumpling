@@ -70,8 +70,9 @@ func ShowCreateView(db *sql.DB, database, view string) (string, error) {
 
 func ListAllTables(db *sql.DB, database string) ([]string, error) {
 	var tables oneStrColumnTable
-	const query = "SELECT table_name FROM information_schema.tables WHERE table_schema = ? and table_type = 'BASE TABLE'"
-	if err := simpleQueryWithArgs(db, tables.handleOneRow, query, database); err != nil {
+	// const query = "SELECT table_name FROM information_schema.tables WHERE table_schema = ? and table_type = 'BASE TABLE'"
+	query := fmt.Sprintf("SHOW TABLES FROM `%s`;", escapeString(database))
+	if err := simpleQueryWithArgs(db, tables.handleOneRow, query); err != nil {
 		return nil, errors.WithMessage(err, query)
 	}
 	return tables.data, nil
