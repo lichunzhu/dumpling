@@ -399,7 +399,7 @@ LOOP:
 		if cutoff+conf.Rows <= count {
 			orderByClause = fmt.Sprintf("ORDER BY `%s` LIMIT %d, %d", escapeString(field), cutoff, conf.Rows)
 		} else {
-			orderByClause = fmt.Sprintf("ORDER BY `%s` OFFSET %d", escapeString(field), cutoff)
+			orderByClause = fmt.Sprintf("ORDER BY `%s` LIMIT %d, %d", escapeString(field), cutoff, count)
 		}
 		query := buildSelectQuery(dbName, tableName, selectedField, buildWhereCondition(conf, ""), orderByClause)
 		rows, err := db.Query(query)
