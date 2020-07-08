@@ -254,6 +254,11 @@ func splitTableDataIntoChunks(
 		return
 	}
 
+	if conf.SplitThroughLimit {
+		splitChunksThroughLimit(ctx, tableDataIRCh, errCh, linear, dbName, tableName, db, conf, field)
+		return
+	}
+
 	query := fmt.Sprintf("SELECT MIN(`%s`),MAX(`%s`) FROM `%s`.`%s` ",
 		escapeString(field), escapeString(field), escapeString(dbName), escapeString(tableName))
 	if conf.Where != "" {
@@ -346,6 +351,75 @@ LOOP:
 			},
 		}
 		cutoff += estimatedStep
+		select {
+		case <-ctx.Done():
+			break LOOP
+		case tableDataIRCh <- td:
+		}
+	}
+	close(tableDataIRCh)
+}
+
+func splitChunksThroughLimit(
+	ctx context.Context,
+	tableDataIRCh chan TableDataIR,
+	errCh chan error,
+	linear chan struct{},
+	dbName, tableName string, db *sql.DB, conf *Config, field string) {
+	count := estimateCount(dbName, tableName, db, field, conf)
+	log.Info("get estimated rows count", zap.Uint64("estimateCount", count))
+	if count < conf.Rows {
+		// skip chunk logic if estimates are low
+		log.Debug("skip concurrent dump due to estimate count < rows",
+			zap.Uint64("estimate count", count),
+			zap.Uint64("conf.rows", conf.Rows),
+		)
+		linear <- struct{}{}
+		return
+	}
+
+	selectedField, err := buildSelectField(db, dbName, tableName)
+	if err != nil {
+		errCh <- withStack(err)
+		return
+	}
+
+	colTypes, err := GetColumnTypes(db, selectedField, dbName, tableName)
+	if err != nil {
+		errCh <- withStack(err)
+		return
+	}
+
+	cutoff := uint64(0)
+	chunkIndex := 0
+LOOP:
+	for cutoff <= count {
+		chunkIndex += 1
+		var orderByClause string
+		if cutoff+conf.Rows <= count {
+			orderByClause = fmt.Sprintf("ORDER BY `%s` LIMIT %d, %d", escapeString(field), cutoff, conf.Rows)
+		} else {
+			orderByClause = fmt.Sprintf("ORDER BY `%s` OFFSET %d", escapeString(field), cutoff)
+		}
+		query := buildSelectQuery(dbName, tableName, selectedField, buildWhereCondition(conf, ""), orderByClause)
+		rows, err := db.Query(query)
+		if err != nil {
+			errCh <- errors.WithMessage(err, query)
+			return
+		}
+
+		td := &tableData{
+			database:      dbName,
+			table:         tableName,
+			rows:          rows,
+			chunkIndex:    chunkIndex,
+			colTypes:      colTypes,
+			selectedField: selectedField,
+			specCmts: []string{
+				"/*!40101 SET NAMES binary*/;",
+			},
+		}
+		cutoff += conf.Rows
 		select {
 		case <-ctx.Done():
 			break LOOP

@@ -54,6 +54,7 @@ type Config struct {
 	EscapeBackslash   bool
 	DumpEmptyDatabase bool
 	SessionParams     map[string]interface{}
+	SplitThroughLimit bool
 }
 
 func DefaultConfig() *Config {

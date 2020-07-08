@@ -66,6 +66,7 @@ var (
 
 	dumpEmptyDatabase bool
 	escapeBackslash   bool
+	splitThroughLimit bool
 	tidbMemQuotaQuery uint64
 )
 
@@ -115,6 +116,7 @@ func main() {
 	pflag.StringVar(&caPath, "ca", "", "The path name to the certificate authority file for TLS connection")
 	pflag.StringVar(&certPath, "cert", "", "The path name to the client certificate file for TLS connection")
 	pflag.StringVar(&keyPath, "key", "", "The path name to the client private key file for TLS connection")
+	pflag.BoolVar(&splitThroughLimit, "split-through-limit", false, "Use limit to split chunks")
 
 	printVersion := pflag.BoolP("version", "V", false, "Print Dumpling version")
 
@@ -184,6 +186,7 @@ func main() {
 	conf.Security.CAPath = caPath
 	conf.Security.CertPath = certPath
 	conf.Security.KeyPath = keyPath
+	conf.SplitThroughLimit = splitThroughLimit
 	conf.SessionParams["tidb_mem_quota_query"] = tidbMemQuotaQuery
 
 	err = export.Dump(context.Background(), conf)
